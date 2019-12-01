@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"sync"
 	"time"
 )
 
@@ -10,7 +9,6 @@ type TokenBucket struct {
 	fillInterval time.Duration
 	capacity     int64
 	Bucket       chan struct{}
-	mu           sync.Mutex
 }
 
 func (t *TokenBucket) fillToken() {
@@ -24,18 +22,6 @@ func (t *TokenBucket) fillToken() {
 			}
 			fmt.Printf("token count %d in %v\n", len(t.Bucket), time.Now().UTC())
 		}
-	}
-}
-
-func (t *TokenBucket) Take() {}
-
-// take function in internal
-func (t *TokenBucket) take() bool {
-	select {
-	case <-t.Bucket:
-		return true
-	default:
-		return false
 	}
 }
 
