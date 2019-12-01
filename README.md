@@ -82,5 +82,51 @@ token count 100 in 2019-12-01 06:24:51.106018 +0000 UTC
 
 github.com/juju/ratelimit 也是这样计算的。
 
+```go
+type TokenBucket struct {
+	capacity     int64
+	fillInterval time.Duration
+	mu           sync.Mutex
 
+	q int64
+	t time.Time
+	k int64
+}
+
+func (tb *TokenBucket) take(count int64) bool {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+
+	if count <= 0 {
+		return true
+	}
+	curTime := time.Now()
+
+	// (t2 - t1) / ti * x + k1
+	tb.k += int64(curTime.Sub(tb.t)) * tb.q
+	tb.t = curTime
+
+	if tb.k > tb.capacity {
+		tb.k = tb.capacity
+	}
+
+	return tb.k-count >= 0
+}
+
+func main() {
+	var i = 1
+	var fillInterval = time.Millisecond * 10
+
+	bucket := &TokenBucket{
+		capacity:     int64(i),
+		fillInterval: fillInterval,
+		q:            1,
+		t:            time.Now(),
+		k:            0,
+	}
+
+	takeResult := bucket.take(1)
+	fmt.Println("take result", takeResult)
+}
+```
 
