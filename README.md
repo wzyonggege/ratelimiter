@@ -18,12 +18,55 @@
 
 ## 令牌桶
 
+令牌桶看上去像一个全局加减的计数器，可以配合读写锁进行计数，在GO中，也可以用一个
+channel 来完成加减的token的操作。
+
+每隔fillInterval时间就往令牌桶bucket 添加token，超过capacity则放弃
+
 ```go
-func (tb *Bucket) Take(count int64) time.Duration {}
-func (tb *Bucket) TakeAvailable(count int64) int64 {}
-func (tb *Bucket) TakeMaxDuration(count int64, maxWait time.Duration) (
-    time.Duration, bool,
-) {}
-func (tb *Bucket) Wait(count int64) {}
-func (tb *Bucket) WaitMaxDuration(count int64, maxWait time.Duration) bool {}
+type TokenBucket struct {
+	fillInterval time.Duration
+	capacity int64
+	Bucket chan struct{}
+}
+
+func (t *TokenBucket) fillToken()  {
+	c := time.NewTicker(t.fillInterval)
+	for {
+		select {
+		case <- c.C:
+			select {
+			case t.Bucket <- struct{}{}:
+			default:
+			}
+			fmt.Printf("token count %d in %v\n", len(t.Bucket), time.Now().UTC())
+		}
+	}
+}
+
+func main()  {
+	done := make(chan struct{})
+	tb := &TokenBucket{
+		fillInterval: time.Millisecond * 10,
+		capacity: 100,
+	}
+	tb.Bucket = make(chan struct{}, tb.capacity)
+
+	go tb.fillToken()
+	<- done
+}
+
 ```
+
+可以看到输出
+```bash
+token count 95 in 2019-12-01 06:24:51.036007 +0000 UTC
+token count 96 in 2019-12-01 06:24:51.045262 +0000 UTC
+token count 97 in 2019-12-01 06:24:51.056807 +0000 UTC
+token count 98 in 2019-12-01 06:24:51.065552 +0000 UTC
+token count 99 in 2019-12-01 06:24:51.075493 +0000 UTC
+token count 100 in 2019-12-01 06:24:51.086583 +0000 UTC
+token count 100 in 2019-12-01 06:24:51.097242 +0000 UTC
+token count 100 in 2019-12-01 06:24:51.106018 +0000 UTC
+```
+
