@@ -2,37 +2,52 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
 type TokenBucket struct {
-	fillInterval time.Duration
 	capacity     int64
-	Bucket       chan struct{}
+	fillInterval time.Duration
+	mu           sync.Mutex
+
+	q int64
+	t time.Time
+	k int64
 }
 
-func (t *TokenBucket) fillToken() {
-	c := time.NewTicker(t.fillInterval)
-	for {
-		select {
-		case <-c.C:
-			select {
-			case t.Bucket <- struct{}{}:
-			default:
-			}
-			fmt.Printf("token count %d in %v\n", len(t.Bucket), time.Now().UTC())
-		}
+func (tb *TokenBucket) take(count int64) bool {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+
+	if count <= 0 {
+		return true
 	}
+	curTime := time.Now()
+
+	// (t2 - t1) / ti * x + k1
+	tb.k += int64(curTime.Sub(tb.t)) * tb.q
+	tb.t = curTime
+
+	if tb.k > tb.capacity {
+		tb.k = tb.capacity
+	}
+
+	return tb.k-count >= 0
 }
 
 func main() {
-	done := make(chan struct{})
-	tb := &TokenBucket{
-		fillInterval: time.Millisecond * 10,
-		capacity:     100,
-	}
-	tb.Bucket = make(chan struct{}, tb.capacity)
+	var i = 1
+	var fillInterval = time.Millisecond * 10
 
-	go tb.fillToken()
-	<-done
+	bucket := &TokenBucket{
+		capacity:     int64(i),
+		fillInterval: fillInterval,
+		q:            1,
+		t:            time.Now(),
+		k:            0,
+	}
+
+	takeResult := bucket.take(1)
+	fmt.Println("take result", takeResult)
 }
