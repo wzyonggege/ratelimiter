@@ -33,7 +33,12 @@ func (tb *TokenBucket) take(count int64) bool {
 		tb.k = tb.capacity
 	}
 
-	return tb.k-count >= 0
+	if tb.k-count >= 0 {
+		tb.k = tb.k-count
+		return true
+	}
+
+	return false
 }
 
 func main() {

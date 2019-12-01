@@ -88,9 +88,9 @@ type TokenBucket struct {
 	fillInterval time.Duration
 	mu           sync.Mutex
 
-	q int64
-	t time.Time
-	k int64
+	q int64 // 每次放入桶内token的数量
+	t time.Time // 上一次记录的时间
+	k int64 // 上次记录的时间时token 数量
 }
 
 func (tb *TokenBucket) take(count int64) bool {
@@ -110,7 +110,12 @@ func (tb *TokenBucket) take(count int64) bool {
 		tb.k = tb.capacity
 	}
 
-	return tb.k-count >= 0
+	if tb.k-count >= 0 {
+    		tb.k = tb.k-count
+    		return true
+    	}
+    
+    return false
 }
 
 func main() {
